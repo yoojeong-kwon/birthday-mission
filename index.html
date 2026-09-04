@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>SECURE MISSION TERMINAL</title>
+
+<style>
+:root{
+  --bg:#000;
+  --green:#39ff88;
+  --green2:#00d96f;
+  --green3:#7dffae;
+  --dim:#0b5f38;
+  --muted:#5b9a75;
+  --line:rgba(57,255,136,.22);
+  --panel:rgba(0,15,8,.68);
+  --danger:#ff4d4d;
+}
+
+*{box-sizing:border-box}
+
+html,body{
+  margin:0;
+  width:100%;
+  min-height:100%;
+  background:#000;
+  color:var(--green);
+  font-family:"Courier New",Consolas,monospace;
+
+  overflow-x:hidden;
+}
+
+canvas#matrix{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
+  z-index:0;
+  opacity:.34;
+}
+
+.vignette{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:1;
+  background:
+    radial-gradient(circle at center,transparent 30%,rgba(0,0,0,.25) 65%,rgba(0,0,0,.86) 100%);
+}
+
+.scanlines{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:20;
+  opacity:.18;
+  background:repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,.04) 0,
+    rgba(255,255,255,.04) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
+.noise{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:19;
+  opacity:.035;
+  background-image:
+    radial-gradient(circle at 15% 15%,#fff 0 1px,transparent 1px),
+    radial-gradient(circle at 80% 35%,#fff 0 1px,transparent 1px),
+    radial-gradient(circle at 45% 70%,#fff 0 1px,transparent 1px);
+  background-size:8px 8px,11px 11px,13px 13px;
+}
+
+.scene{
+  position:fixed;
+  inset:0;
+  z-index:5;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .28s ease;
+
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+
+.scene.active{
+  opacity:1;
+  pointer-events:auto;
+}
+
+.frame{
+  width:min(960px,92vw);
+  min-height:min(650px,88vh);
+  border:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(0,11,5,.82),rgba(0,0,0,.88));
+  box-shadow:
+    0 0 32px rgba(0,255,120,.06),
+    inset 0 0 42px rgba(0,255,120,.035);
+  position:relative;
+  padding:28px;
+}
+
+.corner{
+  position:absolute;
+  width:18px;
+  height:18px;
+}
+
+.c1{left:-1px;top:-1px;border-left:2px solid var(--green);border-top:2px solid var(--green)}
+.c2{right:-1px;top:-1px;border-right:2px solid var(--green);border-top:2px solid var(--green)}
+.c3{left:-1px;bottom:-1px;border-left:2px solid var(--green);border-bottom:2px solid var(--green)}
+.c4{right:-1px;bottom:-1px;border-right:2px solid var(--green);border-bottom:2px solid var(--green)}
+
+.topline{
+  display:flex;
+  justify-content:space-between;
+  gap:15px;
+  align-items:center;
+  padding-bottom:13px;
+  border-bottom:1px solid var(--line);
+  font-size:9px;
+  letter-spacing:.15em;
+  color:var(--muted);
+}
+
+.status-dot{
+  display:inline-block;
+  width:6px;
+  height:6px;
+  margin-right:7px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 10px var(--green);
+  animation:blink 1.2s steps(1) infinite;
+}
+
+@keyframes blink{50%{opacity:.2}}
+
+.glitch{
+  text-shadow:
+    1px 0 rgba(57,255,136,.6),
+    -1px 0 rgba(0,217,111,.35);
+}
+
+/* BOOT */
+#boot .frame{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+.boot-head{
+  font-size:12px;
+  letter-spacing:.2em;
+  margin-bottom:25px;
+  color:var(--green3);
+}
+
+.boot-log{
+  font-size:12px;
+  line-height:1.75;
+  color:#24cb70;
+  height:230px;
+  overflow:hidden;
+}
+
+.boot-row{
+  opacity:0;
+  animation:appear .05s forwards;
+}
+
+@keyframes appear{to{opacity:1}}
+
+.access-bar{
+  margin-top:24px;
+  width:min(560px,100%);
+  border:1px solid var(--line);
+  height:22px;
+  padding:3px;
+}
+
+.access-fill{
+  height:100%;
+  width:0;
+  background:linear-gradient(90deg,#0a6e3c,#39ff88);
+  box-shadow:0 0 12px rgba(57,255,136,.32);
+  transition:width .08s linear;
+}
+
+/* UPLINK */
+.uplink-body{
+  display:grid;
+  grid-template-columns:1.15fr .85fr;
+  gap:36px;
+  align-items:center;
+  min-height:500px;
+}
+
+.uplink-kicker{
+  color:var(--muted);
+  font-size:10px;
+  letter-spacing:.22em;
+  margin-bottom:18px;
+}
+
+.uplink-title{
+  margin:0;
+  font-size:clamp(36px,7vw,72px);
+  line-height:.92;
+  letter-spacing:-.05em;
+  color:var(--green3);
+}
+
+.uplink-text{
+  margin-top:27px;
+  max-width:540px;
+  color:#80dca9;
+  font-size:13px;
+  line-height:1.9;
+}
+
+.terminal-btn{
+  margin-top:32px;
+  border:1px solid var(--green2);
+  background:rgba(0,217,111,.04);
+  color:var(--green3);
+  padding:14px 18px;
+  font-family:inherit;
+  font-size:10px;
+  letter-spacing:.15em;
+  cursor:pointer;
+  box-shadow:inset 3px 0 0 var(--green2);
+}
+
+.terminal-btn:hover{
+  background:rgba(0,217,111,.10);
+}
+
+.radar{
+  width:min(310px,30vw);
+  aspect-ratio:1;
+  border:1px solid var(--line);
+  border-radius:50%;
+  position:relative;
+  margin:auto;
+  background:
+    radial-gradient(circle,transparent 0 16%,rgba(57,255,136,.06) 17% 18%,transparent 19% 35%,rgba(57,255,136,.05) 36% 37%,transparent 38%),
+    linear-gradient(90deg,transparent 49.7%,rgba(57,255,136,.15) 50%,transparent 50.3%),
+    linear-gradient(transparent 49.7%,rgba(57,255,136,.15) 50%,transparent 50.3%);
+}
+
+.radar::before{
+  content:"";
+  position:absolute;
+  inset:7%;
+  border-radius:50%;
+  background:conic-gradient(from 0deg,rgba(57,255,136,.35),transparent 18%,transparent 100%);
+  animation:radar 2s linear infinite;
+}
+
+@keyframes radar{to{transform:rotate(360deg)}}
+
+.radar::after{
+  content:"";
+  position:absolute;
+  width:7px;height:7px;border-radius:50%;
+  left:66%;top:35%;
+  background:var(--green3);
+  box-shadow:0 0 12px var(--green);
+}
+
+/* AUTH */
+.auth-wrap{
+  min-height:500px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+.section-code{
+  color:var(--muted);
+  letter-spacing:.2em;
+  font-size:9px;
+  margin-bottom:18px;
+}
+
+.auth-title{
+  font-size:clamp(35px,7vw,68px);
+  font-weight:700;
+  letter-spacing:-.05em;
+  color:var(--green3);
+}
+
+.auth-desc{
+  margin-top:18px;
+  line-height:1.75;
+  color:#6ab38a;
+  font-size:12px;
+}
+
+.input-line{
+  margin-top:34px;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:10px;
+  width:min(620px,100%);
+}
+
+input{
+  background:rgba(0,0,0,.58);
+  border:1px solid var(--line);
+  color:var(--green3);
+  padding:14px 15px;
+  outline:none;
+  font-family:inherit;
+  font-size:18px;
+}
+
+input:focus{
+  border-color:var(--green2);
+  box-shadow:0 0 15px rgba(0,217,111,.08);
+}
+
+.verify-btn{
+  border:1px solid var(--green2);
+  background:#03150c;
+  color:var(--green3);
+  padding:0 18px;
+  font-family:inherit;
+  font-size:10px;
+  letter-spacing:.13em;
+  cursor:pointer;
+}
+
+.auth-status{
+  margin-top:15px;
+  min-height:18px;
+  font-size:10px;
+  letter-spacing:.1em;
+  color:var(--muted);
+}
+
+.auth-status.err{color:var(--danger)}
+.auth-status.ok{color:var(--green3)}
+
+/* DECRYPT */
+.decrypt-box{
+  min-height:500px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+
+.decrypt-title{
+  font-size:14px;
+  letter-spacing:.25em;
+}
+
+.decrypt-code{
+  margin-top:24px;
+  width:min(700px,100%);
+  height:120px;
+  overflow:hidden;
+  font-size:11px;
+  line-height:1.55;
+  color:#168f50;
+  text-align:left;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+  padding:12px 0;
+}
+
+.decrypt-percent{
+  margin-top:20px;
+  font-size:clamp(32px,6vw,60px);
+  color:var(--green3);
+}
+
+/* MISSION */
+.mission-grid{
+  display:grid;
+  grid-template-columns:.72fr 1.28fr;
+  gap:42px;
+  min-height:520px;
+  align-items:stretch;
+}
+
+.dossier{
+  border-right:1px solid var(--line);
+  padding-right:30px;
+}
+
+.classified{
+  display:inline-block;
+  border:1px solid var(--green2);
+  padding:5px 8px;
+  font-size:8px;
+  letter-spacing:.16em;
+  margin-bottom:28px;
+}
+
+.meta{
+  display:grid;
+  gap:14px;
+  font-size:10px;
+  color:#72b48d;
+}
+
+.meta b{
+  color:var(--green3);
+  font-weight:normal;
+}
+
+.agent-box{
+  margin-top:35px;
+  padding:20px 0;
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+}
+
+.agent-label{
+  font-size:8px;
+  color:var(--muted);
+  letter-spacing:.18em;
+}
+
+.agent-name{
+  margin-top:9px;
+  font-size:clamp(24px,4vw,38px);
+  color:var(--green3);
+}
+
+.mission-content{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+
+.mission-tag{
+  color:var(--muted);
+  letter-spacing:.22em;
+  font-size:9px;
+}
+
+.mission-title{
+  margin-top:12px;
+  font-size:clamp(36px,6vw,64px);
+  letter-spacing:-.05em;
+  color:var(--green3);
+}
+
+.briefing{
+  margin-top:28px;
+  display:grid;
+  gap:11px;
+  color:#8bd9aa;
+  line-height:1.8;
+  font-size:13px;
+}
+
+.clue-lock{
+  margin-top:30px;
+  border:1px solid var(--line);
+  background:rgba(0,20,10,.34);
+  padding:20px;
+}
+
+.clue-label{
+  color:var(--muted);
+  font-size:8px;
+  letter-spacing:.18em;
+}
+
+.clue-hidden{
+  margin-top:13px;
+  font-size:13px;
+  letter-spacing:.08em;
+  color:#25744b;
+  filter:blur(4px);
+  user-select:none;
+}
+
+.clue-revealed{
+  margin-top:13px;
+  font-size:clamp(20px,3.6vw,32px);
+  line-height:1.45;
+  color:var(--green3);
+}
+
+.after{
+  margin-top:17px;
+  color:#6f9e81;
+  font-size:11px;
+  line-height:1.7;
+}
+
+.final-note{
+  margin-top:26px;
+  padding-top:14px;
+  border-top:1px solid var(--line);
+  color:#315b43;
+  font-size:8px;
+  letter-spacing:.10em;
+}
+
+/* Mobile */
+@media(max-width:760px){
+
+  .scene{
+    align-items:flex-start;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .frame{
+    width:94vw;
+    min-height:92vh;
+    height:auto;
+    margin:4vh auto;
+    padding:20px;
+  }
+
+  .topline span:nth-child(3){display:none}
+
+  .uplink-body{
+    display:block;
+    min-height:auto;
+    padding-top:10vh;
+  }
+
+  .radar{
+    position:absolute;
+    width:260px;
+    right:-85px;
+    top:100px;
+    opacity:.22;
+  }
+
+  .uplink-text{max-width:78vw}
+
+  .input-line{grid-template-columns:1fr}
+  .verify-btn{padding:14px}
+
+  .mission-grid{
+    display:block;
+    min-height:auto;
+  }
+
+  .dossier{
+    border-right:0;
+    border-bottom:1px solid var(--line);
+    padding:0 0 24px;
+  }
+
+  .mission-content{
+    padding-top:28px;
+  }
+
+  .boot-log{
+    height:260px;
+    font-size:10px;
+  }
+
+#mission{
+  overflow-y:auto;
+  overflow-x:hidden;
+  }
+
+#mission .frame{
+  margin-top:4vh;
+  margin-bottom:4vh;
+  }
+
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="matrix"></canvas>
+<div class="vignette"></div>
+<div class="noise"></div>
+<div class="scanlines"></div>
+
+<!-- BOOT -->
+<section class="scene active" id="boot">
+  <div class="frame">
+    <span class="corner c1"></span><span class="corner c2"></span>
+    <span class="corner c3"></span><span class="corner c4"></span>
+
+    <div class="topline">
+      <span>SECURE OPERATIONS NETWORK</span>
+      <span><i class="status-dot"></i>LOCAL NODE ACTIVE</span>
+      <span>ENCRYPTION // AES-4096</span>
+    </div>
+
+    <div style="margin-top:55px">
+      <div class="boot-head glitch">[ INITIALIZING FIELD TERMINAL ]</div>
+      <div class="boot-log" id="bootLog"></div>
+
+      <div class="access-bar">
+        <div class="access-fill" id="accessFill"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- UPLINK -->
+<section class="scene" id="uplink">
+  <div class="frame">
+    <span class="corner c1"></span><span class="corner c2"></span>
+    <span class="corner c3"></span><span class="corner c4"></span>
+
+    <div class="topline">
+      <span>SECURE UPLINK</span>
+      <span><i class="status-dot"></i>CHANNEL ESTABLISHED</span>
+      <span id="topCase"></span>
+    </div>
+
+    <div class="uplink-body">
+      <div>
+        <div class="uplink-kicker">INCOMING CLASSIFIED TRANSMISSION</div>
+
+        <h1 class="uplink-title glitch">
+          AGENT<br>TERMINAL
+        </h1>
+
+        <div class="uplink-text">
+          승인되지 않은 사용자의 접근은 기록됩니다.<br>
+          이 단말기는 지정된 대상에게만 임무 정보를 제공합니다.
+        </div>
+
+        <button class="terminal-btn" onclick="showScene('auth')">
+          &gt; OPEN SECURE CHANNEL
+        </button>
+      </div>
+
+      <div class="radar"></div>
+    </div>
+  </div>
+</section>
+
+<!-- AUTH -->
+<section class="scene" id="auth">
+  <div class="frame">
+    <span class="corner c1"></span><span class="corner c2"></span>
+    <span class="corner c3"></span><span class="corner c4"></span>
+
+    <div class="topline">
+      <span>IDENTITY GATEWAY</span>
+      <span><i class="status-dot"></i>AWAITING CREDENTIALS</span>
+      <span id="authCase"></span>
+    </div>
+
+    <div class="auth-wrap">
+      <div class="section-code">AUTH NODE // SUBJECT VERIFICATION</div>
+
+      <div class="auth-title">
+        IDENTIFY<br>YOURSELF_
+      </div>
+
+      <div class="auth-desc">
+        다음 작전 파일은 특정 요원에게만 공개됩니다.<br>
+        본인의 이름을 입력하여 신원을 확인하십시오.
+      </div>
+
+      <div class="input-line">
+        <input id="nameInput" type="text" placeholder="ENTER NAME" autocomplete="off">
+        <button class="verify-btn" onclick="verifyName()">VERIFY ID</button>
+      </div>
+
+      <div class="auth-status" id="authStatus">
+        &gt; WAITING FOR INPUT...
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DECRYPT -->
+<section class="scene" id="decrypt">
+  <div class="frame">
+    <span class="corner c1"></span><span class="corner c2"></span>
+    <span class="corner c3"></span><span class="corner c4"></span>
+
+    <div class="topline">
+      <span>DECRYPTION NODE</span>
+      <span><i class="status-dot"></i>PROCESS ACTIVE</span>
+      <span>LEVEL // CLASSIFIED</span>
+    </div>
+
+    <div class="decrypt-box">
+      <div class="decrypt-title">DECRYPTING MISSION PACKAGE</div>
+
+      <div class="decrypt-code" id="decryptCode"></div>
+
+      <div class="decrypt-percent" id="decryptPercent">0%</div>
+    </div>
+  </div>
+</section>
+
+<!-- MISSION -->
+<section class="scene" id="mission">
+  <div class="frame">
+    <span class="corner c1"></span><span class="corner c2"></span>
+    <span class="corner c3"></span><span class="corner c4"></span>
+
+    <div class="topline">
+      <span>MISSION FILE // OPEN</span>
+      <span><i class="status-dot"></i>CLEARANCE GRANTED</span>
+      <span id="missionCase"></span>
+    </div>
+
+    <div class="mission-grid" style="margin-top:28px">
+
+      <aside class="dossier">
+        <div class="classified">CLASSIFIED // EYES ONLY</div>
+
+        <div class="meta">
+          <div>CASE ID<br><b id="caseId"></b></div>
+          <div>AGENT ID<br><b id="agentId"></b></div>
+          <div>STATUS<br><b>ACTIVE</b></div>
+          <div>PRIORITY<br><b>LEVEL 1</b></div>
+        </div>
+
+        <div class="agent-box">
+          <div class="agent-label">AUTHORIZED SUBJECT</div>
+          <div class="agent-name" id="targetName"></div>
+        </div>
+      </aside>
+
+      <main class="mission-content">
+        <div class="mission-tag">MISSION 00 // INITIAL CONTACT</div>
+        <div class="mission-title" id="missionTitle"></div>
+
+        <div class="briefing" id="briefing"></div>
+
+        <div class="clue-lock">
+          <div class="clue-label">ENCRYPTED LOCATION DATA</div>
+          <div class="clue-hidden" id="clueHidden">
+            X4F9-02 / SECTOR UNKNOWN / DATA LOCKED / X4F9-02
+          </div>
+
+          <button class="terminal-btn" id="decryptClueBtn" onclick="revealClue()">
+            &gt; DECRYPT LOCATION CLUE
+          </button>
+
+          <div id="clueResult" style="display:none">
+            <div class="clue-revealed" id="missionHint"></div>
+            <div class="after" id="afterHint"></div>
+          </div>
+        </div>
+
+        <div class="final-note">
+          // THIS TERMINAL CONTAINS RESTRICTED MISSION DATA<br>
+          // NEXT INSTRUCTION MUST BE ACQUIRED IN THE FIELD
+        </div>
+      </main>
+
+    </div>
+  </div>
+</section>
+
+<script>
+const CONFIG = {
+  targetName: "원연주",
+  agentId: "WYJ-0920",
+  caseId: "BRTH-0920-X",
+  briefing: ["당신을 위해 준비된 생일선물이 사라졌습니다.", "범인은 현장에 여러 개의 단서를 남겼습니다.", "선물을 회수하려면 모든 임무를 완료해야 합니다."],
+  missionTitle: "INITIAL CONTACT",
+  missionHint: "생계를 위한 두 번째 신분. 당신이 직업을 안정시키기 전까지 근무했던 장소.",
+  afterHint: "해당 위치에서 'MISSION 01'이라고 표기된 봉투를 확보하십시오."
+};
+
+/* =========================
+   MATRIX RAIN
+========================= */
+const canvas = document.getElementById("matrix");
+const ctx = canvas.getContext("2d");
+
+let w,h,fontSize,columns,drops;
+const chars = "01ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%&@*+-<>[]{}アイウエオカキクケコ";
+
+function initMatrix(){
+  w = canvas.width = window.innerWidth * devicePixelRatio;
+  h = canvas.height = window.innerHeight * devicePixelRatio;
+  fontSize = 15 * devicePixelRatio;
+  columns = Math.floor(w / fontSize);
+  drops = Array(columns).fill(0).map(()=>Math.random()*-50);
+}
+
+function drawMatrix(){
+  ctx.fillStyle="rgba(0,0,0,.09)";
+  ctx.fillRect(0,0,w,h);
+
+  ctx.font = `${fontSize}px monospace`;
+
+  for(let i=0;i<drops.length;i++){
+    const char=chars[Math.floor(Math.random()*chars.length)];
+
+    ctx.fillStyle = Math.random()>.97
+      ? "rgba(180,255,205,.95)"
+      : "rgba(20,220,105,.72)";
+
+    ctx.fillText(char,i*fontSize,drops[i]*fontSize);
+
+    if(drops[i]*fontSize>h && Math.random()>.975){
+      drops[i]=0;
+    }
+
+    drops[i]+=0.55+Math.random()*.45;
+  }
+
+  requestAnimationFrame(drawMatrix);
+}
+
+initMatrix();
+drawMatrix();
+window.addEventListener("resize",initMatrix);
+
+
+/* =========================
+   BASIC DATA
+========================= */
+
+document.getElementById("topCase").textContent = CONFIG.caseId;
+document.getElementById("authCase").textContent = CONFIG.caseId;
+document.getElementById("missionCase").textContent = CONFIG.caseId;
+document.getElementById("caseId").textContent = CONFIG.caseId;
+document.getElementById("agentId").textContent = CONFIG.agentId;
+document.getElementById("targetName").textContent = CONFIG.targetName;
+document.getElementById("missionTitle").textContent = CONFIG.missionTitle;
+document.getElementById("missionHint").textContent = CONFIG.missionHint;
+document.getElementById("afterHint").textContent = CONFIG.afterHint;
+
+document.getElementById("briefing").innerHTML =
+  CONFIG.briefing.map(x=>`<div>&gt; ${x}</div>`).join("");
+
+
+/* =========================
+   SCENE
+========================= */
+
+function showScene(id){
+  document.querySelectorAll(".scene").forEach(el=>el.classList.remove("active"));
+
+  setTimeout(()=>{
+    document.getElementById(id).classList.add("active");
+  },70);
+}
+
+
+/* =========================
+   BOOT
+========================= */
+
+const bootLines = [
+  "[OK] BOOTING SECURE OPERATIONS KERNEL...",
+  "[OK] MEMORY INTEGRITY CHECK",
+  "[OK] NETWORK INTERFACE LOCKED",
+  "[OK] ESTABLISHING ENCRYPTED TUNNEL",
+  "[OK] LOADING FIELD OPERATIONS DATABASE",
+  "[OK] AUTHENTICATION NODE ONLINE",
+  "[OK] MISSION PACKAGE DETECTED",
+  "[OK] ACCESS CHANNEL READY"
+];
+
+const log = document.getElementById("bootLog");
+const fill = document.getElementById("accessFill");
+
+let bootIndex = 0;
+
+function addBootLine(){
+
+  if(bootIndex < bootLines.length){
+
+    const row = document.createElement("div");
+    row.className="boot-row";
+    row.textContent = bootLines[bootIndex];
+
+    log.appendChild(row);
+
+    fill.style.width =
+      `${((bootIndex+1)/bootLines.length)*100}%`;
+
+    bootIndex++;
+
+    setTimeout(addBootLine,90);
+
+  }else{
+
+    setTimeout(()=>{
+      showScene("uplink");
+    },350);
+  }
+}
+
+setTimeout(addBootLine,180);
+
+
+/* =========================
+   VERIFY
+========================= */
+
+function normalize(v){
+  return v.replace(/\s+/g,"").trim();
+}
+
+function verifyName(){
+
+  const input = document.getElementById("nameInput");
+  const status = document.getElementById("authStatus");
+
+  if(normalize(input.value) === normalize(CONFIG.targetName)){
+
+    status.className="auth-status ok";
+    status.textContent="> IDENTITY CONFIRMED // CLEARANCE GRANTED";
+
+    setTimeout(()=>{
+      showScene("decrypt");
+      runDecrypt();
+    },520);
+
+  }else{
+
+    status.className="auth-status err";
+    status.textContent="> ACCESS DENIED // IDENTITY MISMATCH";
+
+    input.animate(
+      [
+        {transform:"translateX(0)"},
+        {transform:"translateX(-6px)"},
+        {transform:"translateX(6px)"},
+        {transform:"translateX(0)"}
+      ],
+      {duration:220}
+    );
+
+    input.select();
+  }
+}
+
+document.getElementById("nameInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter") verifyName();
+});
+
+
+/* =========================
+   DECRYPT
+========================= */
+
+function randomCodeLine(){
+  const hex="ABCDEF0123456789";
+  let s="";
+
+  for(let i=0;i<64;i++){
+    s += hex[Math.floor(Math.random()*hex.length)];
+    if(i%8===7) s+=" ";
+  }
+
+  return s;
+}
+
+function runDecrypt(){
+
+  const code=document.getElementById("decryptCode");
+  const percent=document.getElementById("decryptPercent");
+
+  let p=0;
+
+  const timer=setInterval(()=>{
+
+    code.innerHTML =
+      Array(7).fill(0)
+      .map(()=>randomCodeLine())
+      .join("<br>");
+
+    p += Math.floor(Math.random()*10)+6;
+
+    if(p>=100) p=100;
+
+    percent.textContent = p+"%";
+
+    if(p===100){
+
+      clearInterval(timer);
+
+      setTimeout(()=>{
+        showScene("mission");
+      },330);
+    }
+
+  },95);
+}
+
+
+/* =========================
+   LOCATION CLUE
+========================= */
+
+function revealClue(){
+
+  const btn=document.getElementById("decryptClueBtn");
+  const hidden=document.getElementById("clueHidden");
+  const result=document.getElementById("clueResult");
+
+  btn.disabled=true;
+  btn.textContent="> DECRYPTING...";
+
+  let count=0;
+
+  const timer=setInterval(()=>{
+
+    hidden.textContent=randomCodeLine().slice(0,48);
+    count++;
+
+    if(count>=10){
+
+      clearInterval(timer);
+
+      hidden.style.display="none";
+      btn.style.display="none";
+      result.style.display="block";
+    }
+
+  },70);
+}
+</script>
+
+</body>
+</html>
